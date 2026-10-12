@@ -1,0 +1,535 @@
+<!-- 交接 / Handoff: BMI 計算器 v2 強化版 — 公制／英制切換、健康體重範圍與增減重建議、視覺化 BMI 標尺、本地計算紀錄（最多 10 筆）、一鍵複製結果；純前端、不外傳任何資料；可直接使用。 -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMI 計算器 v2</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", "微軟正黑體", sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px 16px;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.05);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 520px;
+      padding: 28px;
+    }
+
+    .title-row { text-align: center; margin-bottom: 6px; }
+    h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; }
+    .ver {
+      font-size: 0.7rem; font-weight: 700; color: var(--primary);
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-radius: 10px; padding: 2px 8px; vertical-align: middle; margin-left: 6px;
+    }
+    .subtitle { font-size: 0.88rem; color: var(--text-muted); text-align: center; margin-bottom: 20px; }
+
+    .unit-toggle { display: flex; justify-content: center; margin-bottom: 18px; }
+    .unit-group {
+      display: inline-flex; background-color: #f1f5f9; padding: 3px;
+      border-radius: 20px; border: 1px solid var(--border-color); gap: 2px;
+    }
+    .unit-btn {
+      padding: 5px 16px; font-size: 0.85rem; font-weight: 600;
+      border-radius: 16px; border: none; background: transparent;
+      color: var(--text-muted); cursor: pointer; transition: all 0.2s ease;
+    }
+    .unit-btn.active { background-color: var(--card-bg); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.92rem; font-weight: 600; margin-bottom: 6px; color: #334155; }
+    input[type="text"] {
+      width: 100%; padding: 11px 13px; border: 1.5px solid var(--border-color);
+      border-radius: 8px; font-size: 1rem; color: var(--text-main); background-color: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    .row-2 { display: flex; gap: 10px; }
+    .row-2 .form-group { flex: 1; margin-bottom: 0; }
+    .inline-inputs { display: flex; gap: 8px; align-items: center; }
+    .inline-inputs .unit-suffix { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
+
+    .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+    button.action-btn {
+      flex: 1; padding: 11px 12px; border: none; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    button.action-btn:active { transform: scale(0.98); }
+    .btn-calc { background-color: var(--primary); color: #fff; }
+    .btn-calc:hover { background-color: var(--primary-hover); }
+    .btn-clear, .btn-copy {
+      background-color: #f1f5f9; color: #475569; border: 1px solid var(--border-color);
+    }
+    .btn-clear:hover, .btn-copy:hover { background-color: #e2e8f0; }
+    .btn-copy.copied { background-color: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+
+    .error-alert {
+      display: none; margin-top: 16px; padding: 11px 15px;
+      background-color: var(--danger-bg); border: 1px solid var(--danger-border);
+      border-radius: 8px; color: var(--danger); font-size: 0.9rem; font-weight: 500; text-align: center;
+    }
+
+    .result-card {
+      display: none; margin-top: 22px; padding: 20px;
+      border-radius: 12px; background-color: #f8fafc; border: 1px solid var(--border-color);
+    }
+    .result-head { text-align: center; margin-bottom: 14px; }
+    .result-title { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; }
+    .result-value { font-size: 2.5rem; font-weight: 800; color: #0f172a; line-height: 1.15; }
+    .badge {
+      display: inline-block; margin-top: 8px; padding: 5px 16px; border-radius: 20px;
+      font-size: 0.92rem; font-weight: 700; color: #fff;
+    }
+    .cat-underweight { background-color: #3b82f6; }
+    .cat-normal      { background-color: #10b981; }
+    .cat-overweight  { background-color: #f59e0b; }
+    .cat-obese1      { background-color: #f97316; }
+    .cat-obese2      { background-color: #ef4444; }
+    .cat-obese3      { background-color: #b91c1c; }
+
+    /* BMI 視覺標尺 */
+    .scale-wrap { margin: 16px 0 4px; }
+    .scale-bar { position: relative; height: 12px; border-radius: 6px; overflow: visible; }
+    .scale-track { display: flex; height: 12px; border-radius: 6px; overflow: hidden; }
+    .seg-u { width: 23.21%; background: #3b82f6; }
+    .seg-n { width: 19.64%; background: #10b981; }
+    .seg-o { width: 10.71%; background: #f59e0b; }
+    .seg-b { width: 46.44%; background: #ef4444; }
+    .scale-marker {
+      position: absolute; top: -5px; width: 4px; height: 22px; border-radius: 2px;
+      background: #0f172a; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      transform: translateX(-50%); display: none;
+    }
+    .scale-labels { display: flex; margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); }
+    .scale-labels span { text-align: center; }
+
+    .detail-list { margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 5px 2px; font-size: 0.88rem; }
+    .detail-row .k { color: var(--text-muted); }
+    .detail-row .v { font-weight: 600; color: #1e293b; }
+
+    .tip-box {
+      margin-top: 12px; padding: 11px 14px; border-radius: 8px;
+      background-color: #eff6ff; border: 1px solid #bfdbfe;
+      font-size: 0.86rem; line-height: 1.55; color: #1e3a8a;
+    }
+
+    .history-section { margin-top: 26px; border-top: 1px solid var(--border-color); padding-top: 16px; }
+    .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .history-title { font-size: 0.92rem; font-weight: 600; color: #334155; }
+    .btn-clear-history {
+      padding: 4px 12px; font-size: 0.78rem; font-weight: 600; border-radius: 6px;
+      border: 1px solid var(--border-color); background: #f8fafc; color: #64748b; cursor: pointer;
+    }
+    .btn-clear-history:hover { background: #f1f5f9; }
+    .history-empty { font-size: 0.83rem; color: var(--text-muted); text-align: center; padding: 8px 0; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .history-table th, .history-table td { padding: 6px 6px; text-align: left; border-bottom: 1px solid var(--border-color); }
+    .history-table th { color: #64748b; font-weight: 600; background: #f8fafc; }
+    .history-table td { color: #334155; }
+
+    .disclaimer { margin-top: 18px; font-size: 0.72rem; color: #94a3b8; line-height: 1.5; text-align: center; }
+
+    @media (max-width: 480px) {
+      .container { padding: 22px 16px; }
+      h1 { font-size: 1.4rem; }
+      .row-2 { flex-direction: column; gap: 16px; }
+      .history-table { font-size: 0.72rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title-row">
+      <h1>BMI 計算器<span class="ver">v2</span></h1>
+    </div>
+    <p class="subtitle">公式：體重(kg) ÷ 身高(m)²</p>
+
+    <div class="unit-toggle">
+      <div class="unit-group" role="group" aria-label="單位制選擇">
+        <button type="button" class="unit-btn active" id="unit-metric" onclick="setUnit('metric')">公制（公分／公斤）</button>
+        <button type="button" class="unit-btn" id="unit-imperial" onclick="setUnit('imperial')">英制（英尺／磅）</button>
+      </div>
+    </div>
+
+    <!-- 公制輸入 -->
+    <div id="panel-metric">
+      <div class="form-group">
+        <label for="m-height">身高（公分）</label>
+        <input type="text" id="m-height" inputmode="decimal" placeholder="例如：170" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="m-weight">體重（公斤）</label>
+        <input type="text" id="m-weight" inputmode="decimal" placeholder="例如：65" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- 英制輸入 -->
+    <div id="panel-imperial" style="display:none;">
+      <div class="form-group">
+        <label>身高（英尺／英寸）</label>
+        <div class="row-2">
+          <div class="form-group">
+            <div class="inline-inputs">
+              <input type="text" id="i-ft" inputmode="decimal" placeholder="英尺" autocomplete="off">
+              <span class="unit-suffix">英尺</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="inline-inputs">
+              <input type="text" id="i-in" inputmode="decimal" placeholder="英寸" autocomplete="off">
+              <span class="unit-suffix">英寸</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="i-lb">體重（磅）</label>
+        <div class="inline-inputs">
+          <input type="text" id="i-lb" inputmode="decimal" placeholder="例如：143" autocomplete="off">
+          <span class="unit-suffix">磅</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button type="button" class="action-btn btn-calc" id="btn-calc">計算</button>
+      <button type="button" class="action-btn btn-copy" id="btn-copy">複製結果</button>
+      <button type="button" class="action-btn btn-clear" id="btn-clear">清除</button>
+    </div>
+
+    <div class="error-alert" id="error-box"></div>
+
+    <div class="result-card" id="result-box">
+      <div class="result-head">
+        <div class="result-title">您的 BMI 是</div>
+        <div class="result-value" id="bmi-value">--</div>
+        <span class="badge" id="bmi-category">--</span>
+      </div>
+
+      <div class="scale-wrap">
+        <div class="scale-bar">
+          <div class="scale-track">
+            <div class="seg-u"></div><div class="seg-n"></div><div class="seg-o"></div><div class="seg-b"></div>
+          </div>
+          <div class="scale-marker" id="scale-marker"></div>
+        </div>
+        <div class="scale-labels">
+          <span style="width:23.21%">過輕</span>
+          <span style="width:19.64%">正常</span>
+          <span style="width:10.71%">過重</span>
+          <span style="width:46.44%">肥胖</span>
+        </div>
+      </div>
+
+      <div class="detail-list">
+        <div class="detail-row"><span class="k">實際 BMI</span><span class="v" id="d-exact">--</span></div>
+        <div class="detail-row"><span class="k">換算身高／體重</span><span class="v" id="d-converted">--</span></div>
+        <div class="detail-row"><span class="k">健康體重範圍</span><span class="v" id="d-range">--</span></div>
+        <div class="detail-row"><span class="k">體重建議</span><span class="v" id="d-advice">--</span></div>
+      </div>
+
+      <div class="tip-box" id="tip-box">--</div>
+    </div>
+
+    <div class="history-section">
+      <div class="history-head">
+        <span class="history-title">我的計算紀錄（最近 10 筆）</span>
+        <button type="button" class="btn-clear-history" id="btn-clear-history">清除紀錄</button>
+      </div>
+      <div id="history-empty" class="history-empty">尚無紀錄，計算後會保存在這台裝置上</div>
+      <table class="history-table" id="history-table" style="display:none;">
+        <thead>
+          <tr><th>時間</th><th>身高</th><th>體重</th><th>BMI</th><th>等級</th></tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+
+    <p class="disclaimer">以上資訊僅供參考，不能取代醫師或營養師的專業建議。BMI 不適用於孕婦、運動員及 18 歲以下族群。所有資料僅保存在本機瀏覽器，不會上傳。</p>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ---------- 分類定義（衛福部標準） ----------
+    const CATEGORIES = [
+      { key: 'underweight',  label: '過輕',      cls: 'cat-underweight',
+        tip: '體重過輕，建議均衡飲食、適量增加熱量與蛋白質攝取；若體重短期內明顯下降，建議諮詢醫師。' },
+      { key: 'normal',       label: '正常',      cls: 'cat-normal',
+        tip: '體位正常，建議維持規律運動與均衡飲食，持續保持現況。' },
+      { key: 'overweight',   label: '過重',      cls: 'cat-overweight',
+        tip: '體重過重，建議調整飲食結構、減少含糖飲料與宵夜，並逐步增加運動量。' },
+      { key: 'obese1',       label: '輕度肥胖',  cls: 'cat-obese1',
+        tip: '已達輕度肥胖，建議積極調整生活型態與飲食，可諮詢營養師擬定減重計畫，並定期量測體重。' },
+      { key: 'obese2',       label: '中度肥胖',  cls: 'cat-obese2',
+        tip: '已達中度肥胖，建議儘速尋求醫師或專科門診協助，評估血糖、血壓、血脂等健康風險並擬定減重計畫。' },
+      { key: 'obese3',       label: '重度肥胖',  cls: 'cat-obese3',
+        tip: '已達重度肥胖，建議立即就醫，由醫療團隊全面評估與協助；同時注意心血管與代謝相關指標。' }
+    ];
+
+    const STORE_KEY = 'bmiCalculatorV2History';
+    let unitSystem = 'metric';
+    let lastResult = null; // { bmiText, category, exact, hCm, wKg, hDisplay, wDisplay, timeStr }
+
+    const $ = id => document.getElementById(id);
+    const errorBox = $('error-box');
+    const resultBox = $('result-box');
+
+    // ---------- 單位切換 ----------
+    function setUnit(unit) {
+      unitSystem = unit;
+      $('panel-metric').style.display = unit === 'metric' ? '' : 'none';
+      $('panel-imperial').style.display = unit === 'imperial' ? '' : 'none';
+      $('unit-metric').classList.toggle('active', unit === 'metric');
+      $('unit-imperial').classList.toggle('active', unit === 'imperial');
+      hideError();
+      // 切換單位時保留數值不套用舊結果，避免混淆
+    }
+
+    // ---------- 讀取輸入 ----------
+    function readInputs() {
+      if (unitSystem === 'metric') {
+        const hRaw = $('m-height').value.trim();
+        const wRaw = $('m-weight').value.trim();
+        if (hRaw === '' || wRaw === '') return { error: 'empty' };
+        const h = Number(hRaw), w = Number(wRaw);
+        if (isNaN(h) || isNaN(w)) return { error: 'empty' };
+        return { hCm: h, wKg: w, hDisplay: h + ' 公分', wDisplay: w + ' 公斤' };
+      } else {
+        const ftRaw = $('i-ft').value.trim();
+        const inRaw = $('i-in').value.trim();
+        const lbRaw = $('i-lb').value.trim();
+        if ((ftRaw === '' && inRaw === '') || lbRaw === '') return { error: 'empty' };
+        const ft = ftRaw === '' ? 0 : Number(ftRaw);
+        const inch = inRaw === '' ? 0 : Number(inRaw);
+        const lb = Number(lbRaw);
+        if (isNaN(ft) || isNaN(inch) || isNaN(lb)) return { error: 'empty' };
+        const totalInch = ft * 12 + inch;
+        return {
+          hCm: totalInch * 2.54,
+          wKg: lb * 0.45359237,
+          hDisplay: (ftRaw === '' ? 0 : ft) + ' 英尺 ' + (inRaw === '' ? 0 : inch) + ' 英寸',
+          wDisplay: lb + ' 磅'
+        };
+      }
+    }
+
+    // ---------- 顯示錯誤 ----------
+    function showError(key) {
+      const msgs = {
+        empty: '請輸入數字',
+        nonPositive: '數值必須大於 0',
+        range: '請輸入合理的身高體重數值'
+      };
+      errorBox.textContent = msgs[key];
+      errorBox.style.display = 'block';
+      resultBox.style.display = 'none';
+      lastResult = null;
+    }
+    function hideError() { errorBox.style.display = 'none'; }
+
+    // ---------- 分類判定（與 v1 一致：以顯示值判定） ----------
+    function classify(bmiVal) {
+      if (bmiVal < 18.5) return CATEGORIES[0];
+      if (bmiVal < 24.0) return CATEGORIES[1];
+      if (bmiVal < 27.0) return CATEGORIES[2];
+      if (bmiVal < 30.0) return CATEGORIES[3];
+      if (bmiVal < 35.0) return CATEGORIES[4];
+      return CATEGORIES[5];
+    }
+
+    // ---------- 計算 ----------
+    function calculateBMI() {
+      const input = readInputs();
+      if (input.error) { showError(input.error); return; }
+      const { hCm, wKg, hDisplay, wDisplay } = input;
+
+      if (hCm <= 0 || wKg <= 0) { showError('nonPositive'); return; }
+      if (hCm < 50 || hCm > 250 || wKg < 10 || wKg > 300) { showError('range'); return; }
+
+      const hM = hCm / 100;
+      const m2 = hM * hM;
+      const exactBmi = wKg / m2;
+      const bmiText = exactBmi.toFixed(1);
+      const bmiVal = parseFloat(bmiText);
+      const category = classify(bmiVal);
+
+      // 健康體重範圍（BMI 18.5 – 24）
+      const low = 18.5 * m2;
+      const high = 24 * m2;
+      const rangeText = low.toFixed(1) + ' – ' + high.toFixed(1) + ' 公斤';
+
+      // 體重建議
+      let advice;
+      if (bmiVal < 18.5) {
+        const diff = low - wKg;
+        advice = diff < 0.1 ? '接近健康範圍下限，建議稍微增加體重' : '需增重約 ' + diff.toFixed(1) + ' 公斤';
+      } else if (bmiVal >= 24) {
+        const diff = wKg - high;
+        advice = diff < 0.1 ? '接近健康範圍上限，建議維持現況' : '需減重約 ' + diff.toFixed(1) + ' 公斤';
+      } else {
+        advice = '在健康範圍內';
+      }
+
+      // 標尺位置（BMI 12–40 對應 0–100%）
+      const pct = Math.max(0, Math.min(100, (exactBmi - 12) / (40 - 12) * 100));
+
+      // 顯示
+      hideError();
+      $('bmi-value').textContent = bmiText;
+      $('bmi-category').textContent = category.label;
+      $('bmi-category').className = 'badge ' + category.cls;
+      $('d-exact').textContent = exactBmi.toFixed(2);
+      $('d-converted').textContent = hCm.toFixed(1) + ' 公分／' + wKg.toFixed(1) + ' 公斤';
+      $('d-range').textContent = rangeText;
+      $('d-advice').textContent = advice;
+      $('tip-box').textContent = category.tip;
+      const marker = $('scale-marker');
+      marker.style.display = 'block';
+      marker.style.left = pct + '%';
+      resultBox.style.display = 'block';
+
+      const now = new Date();
+      const timeStr = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate() + ' ' +
+        String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+      lastResult = { bmiText, label: category.label, hDisplay, wDisplay, timeStr };
+      addHistory(lastResult);
+    }
+
+    // ---------- 清除 ----------
+    function clearAll() {
+      ['m-height', 'm-weight', 'i-ft', 'i-in', 'i-lb'].forEach(id => { $(id).value = ''; });
+      hideError();
+      resultBox.style.display = 'none';
+      lastResult = null;
+      resetCopyBtn();
+      const first = unitSystem === 'metric' ? $('m-height') : $('i-ft');
+      first.focus();
+    }
+
+    // ---------- 複製結果 ----------
+    function resetCopyBtn() {
+      const b = $('btn-copy');
+      b.textContent = '複製結果';
+      b.classList.remove('copied');
+    }
+    function copyResult() {
+      if (!lastResult) { showError('empty'); return; }
+      const r = lastResult;
+      const text = 'BMI ' + r.bmiText + '（' + r.label + '）\n' +
+        '身高：' + r.hDisplay + '｜體重：' + r.wDisplay + '\n' +
+        '健康體重範圍：' + $('d-range').textContent + '\n' +
+        '計算時間：' + r.timeStr;
+      const done = () => {
+        const b = $('btn-copy');
+        b.textContent = '已複製 ✓';
+        b.classList.add('copied');
+        setTimeout(resetCopyBtn, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+      } else {
+        fallbackCopy(text, done);
+      }
+    }
+    function fallbackCopy(text, done) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { /* 無複製權限時靜默略過 */ }
+      document.body.removeChild(ta);
+    }
+
+    // ---------- 紀錄（僅存本機 localStorage） ----------
+    function loadHistory() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+      catch (e) { return []; }
+    }
+    function saveHistory(list) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch (e) { /* 忽略 */ }
+    }
+    function addHistory(r) {
+      const list = loadHistory();
+      list.unshift({ t: r.timeStr, h: r.hDisplay, w: r.wDisplay, b: r.bmiText, c: r.label });
+      saveHistory(list.slice(0, 10));
+      renderHistory();
+    }
+    function renderHistory() {
+      const list = loadHistory();
+      const table = $('history-table');
+      const empty = $('history-empty');
+      const body = $('history-body');
+      body.innerHTML = '';
+      if (list.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = '';
+        return;
+      }
+      list.forEach(item => {
+        const tr = document.createElement('tr');
+        [item.t, item.h, item.w, item.b, item.c].forEach(v => {
+          const td = document.createElement('td');
+          td.textContent = v;
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+      table.style.display = '';
+      empty.style.display = 'none';
+    }
+    function clearHistory() {
+      saveHistory([]);
+      renderHistory();
+    }
+
+    // ---------- 綁定 ----------
+    $('btn-calc').addEventListener('click', calculateBMI);
+    $('btn-clear').addEventListener('click', clearAll);
+    $('btn-copy').addEventListener('click', copyResult);
+    $('btn-clear-history').addEventListener('click', clearHistory);
+    ['m-height', 'm-weight', 'i-ft', 'i-in', 'i-lb'].forEach(id => {
+      $(id).addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') calculateBMI();
+      });
+    });
+
+    renderHistory();
+  </script>
+</body>
+</html>
